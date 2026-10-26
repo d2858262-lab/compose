@@ -1,88 +1,254 @@
 package com.example.netflixtheme.ui.screens
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.netflixtheme.model.SampleData
-import com.example.netflixtheme.ui.components.*
+import coil.compose.rememberAsyncImagePainter
+import com.example.netflixtheme.model.AppInfo
+import com.example.netflixtheme.model.AppUtils
 import com.example.netflixtheme.ui.theme.*
 
 @Composable
-fun HomeScreen(modifier: Modifier = Modifier) {
-    val listState = rememberLazyListState()
-    val isScrolled by remember { derivedStateOf { listState.firstVisibleItemScrollOffset > 0 } }
+fun HomeScreen(apps: List<AppInfo>, modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    var searchQuery by remember { mutableStateOf("") }
+    var isSearching by remember { mutableStateOf(false) }
+
+    val filteredApps = remember(searchQuery, apps) {
+        if (searchQuery.isEmpty()) apps
+        else apps.filter { it.name.contains(searchQuery, ignoreCase = true) }
+    }
+
+    val featuredApp = remember(apps) { apps.firstOrNull() }
 
     Box(modifier = modifier.fillMaxSize().background(NetflixBlack)) {
-        LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
-            item { FeaturedContent() }
-            item { Spacer(Modifier.height(16.dp)); ContinueWatchingRow(SampleData.continueWatching) }
-            item { Spacer(Modifier.height(24.dp)); TopTenRow(SampleData.trendingMovies) }
-            item { Spacer(Modifier.height(24.dp)); MovieRow("Populer Filmler", SampleData.popularMovies) }
-            item { Spacer(Modifier.height(24.dp)); MovieRow("Aksiyon & Macera", SampleData.popularMovies.shuffled()) }
-            item { Spacer(Modifier.height(24.dp)); MovieRow("Bilim Kurgu & Fantastik", SampleData.trendingMovies.shuffled()) }
-            item { Spacer(Modifier.height(24.dp)); MovieRow("Odullu Filmler", SampleData.popularMovies.reversed()) }
+        LazyColumn(modifier = Modifier.fillMaxSize()) {
+            
+            // Arama yapılmıyorsa Öne Çıkan Uygulama (Hero Banner)
+            if (!isSearching && featuredApp != null) {
+                item {
+                    FeaturedAppBanner(featuredApp) {
+                        AppUtils.launchApp(context, featuredApp.packageName)
+                    }
+                }
+            }
+
+            // Arama Modu
+            if (isSearching) {
+                item {
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
+                        placeholder = { Text("Uygulama Ara...", color = NetflixTextGray) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp)
+                            .statusBarsPadding(),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = NetflixRed,
+                            unfocusedBorderColor = NetflixLightGray,
+                            focusedTextColor = NetflixWhite
+                        )
+                    )
+                }
+            }
+
+            // Uygulama Satırları
+            if (isSearching) {
+                item {
+                    Text(
+                        "Arama Sonuçları (${filteredApps.size})",
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.padding(16.dp)
+                    )
+                }
+                item {
+                    LazyRow(
+                        contentPadding = PaddingValues(horizontal = 16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        items(filteredApps) { app ->
+                            AppCard(app = app) { AppUtils.launchApp(context, app.packageName) }
+                        }
+                    }
+                }
+            } else {
+                // Katman 1: Sık Kullanılanlar
+                item {
+                    AppRow(title = "🔥 Sık Kullanılan Uygulamalar", apps = apps.take(8))
+                }
+                
+                // Katman 2: Tümü (Netflix Satırı)
+                item {
+                    Spacer(Modifier.height(16.dp))
+                    AppRow(title = "📱 Tüm Uygulamalarım", apps = apps)
+                }
+
+                // Katman 3: Karışık Öneriler
+                item {
+                    Spacer(Modifier.height(16.dp))
+                    AppRow(title = "⚡ Hızlı Erişim", apps = apps.shuffled())
+                }
+            }
+
             item { Spacer(Modifier.height(80.dp)) }
         }
-        NetflixTopBar(isScrolled = isScrolled, modifier = Modifier.align(Alignment.TopCenter))
+
+        // Top Bar
+        LauncherTopBar(
+            onSearchClick = { isSearching = !isSearching }
+        )
     }
 }
 
 @Composable
-fun FeaturedContent() {
-    val movie = SampleData.featuredMovie
+fun FeaturedAppBanner(app: AppInfo, onClick: () -> Unit) {
     Box(
-        modifier = Modifier.fillMaxWidth().height(500.dp).background(
-            Brush.verticalGradient(colors = listOf(
-                NetflixDarkRed.copy(alpha = 0.4f), NetflixMediumGray.copy(alpha = 0.3f), NetflixBlack
-            ))
-        )
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(360.dp)
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(
+                        NetflixDarkRed.copy(alpha = 0.5f),
+                        NetflixBlack
+                    )
+                )
+            )
+            .clickable(onClick = onClick)
     ) {
         Column(
-            modifier = Modifier.fillMaxSize().padding(top = 120.dp),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(bottom = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            Spacer(Modifier.weight(1f))
-            Text(movie.title.uppercase(),
-                style = MaterialTheme.typography.displayLarge.copy(
-                    fontSize = 36.sp, fontWeight = FontWeight.Black, letterSpacing = 4.sp, color = NetflixWhite),
-                textAlign = TextAlign.Center, modifier = Modifier.padding(horizontal = 32.dp))
-            Spacer(Modifier.height(8.dp))
-            Text(movie.genre.joinToString(" - "),
-                style = MaterialTheme.typography.bodyMedium.copy(color = NetflixTextGray, letterSpacing = 1.sp))
-            Spacer(Modifier.height(20.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.padding(horizontal = 24.dp)) {
-                Button(onClick = {}, colors = ButtonDefaults.buttonColors(
-                    containerColor = NetflixWhite, contentColor = NetflixBlack),
-                    shape = MaterialTheme.shapes.small,
-                    modifier = Modifier.weight(1f).height(42.dp)) {
-                    Icon(Icons.Default.PlayArrow, null, modifier = Modifier.size(24.dp))
-                    Spacer(Modifier.width(4.dp))
-                    Text("Oynat", style = MaterialTheme.typography.labelLarge.copy(color = NetflixBlack, fontWeight = FontWeight.Bold))
-                }
-                Button(onClick = {}, colors = ButtonDefaults.buttonColors(
-                    containerColor = NetflixLightGray.copy(alpha = 0.7f), contentColor = NetflixWhite),
-                    shape = MaterialTheme.shapes.small,
-                    modifier = Modifier.weight(1f).height(42.dp)) {
-                    Icon(Icons.Default.Add, null, modifier = Modifier.size(20.dp))
-                    Spacer(Modifier.width(4.dp))
-                    Text("Listem", style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold))
-                }
+            Spacer(Modifier.height(60.dp))
+            app.icon?.let { icon ->
+                Image(
+                    painter = rememberAsyncImagePainter(icon),
+                    contentDescription = app.name,
+                    modifier = Modifier
+                        .size(100.dp)
+                        .clip(RoundedCornerShape(20.dp))
+                )
             }
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(12.dp))
+            Text(
+                app.name,
+                style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.Bold),
+                textAlign = TextAlign.Center
+            )
+            Spacer(Modifier.height(16.dp))
+            Button(
+                onClick = onClick,
+                colors = ButtonDefaults.buttonColors(containerColor = NetflixRed, contentColor = NetflixWhite),
+                shape = MaterialTheme.shapes.small
+            ) {
+                Icon(Icons.Default.PlayArrow, null)
+                Spacer(Modifier.width(8.dp))
+                Text("Uygulamayı Aç", fontWeight = FontWeight.Bold)
+            }
+        }
+    }
+}
+
+@Composable
+fun AppRow(title: String, apps: List<AppInfo>) {
+    val context = LocalContext.current
+    Column {
+        Text(
+            title,
+            style = MaterialTheme.typography.titleLarge.copy(color = NetflixWhite),
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+        )
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            items(apps) { app ->
+                AppCard(app = app) { AppUtils.launchApp(context, app.packageName) }
+            }
+        }
+    }
+}
+
+@Composable
+fun AppCard(app: AppInfo, onClick: () -> Unit) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .width(100.dp)
+            .clickable(onClick = onClick)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(90.dp)
+                .clip(MaterialTheme.shapes.medium)
+                .background(NetflixDarkGray)
+                .padding(12.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            app.icon?.let { icon ->
+                Image(
+                    painter = rememberAsyncImagePainter(icon),
+                    contentDescription = app.name,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+        }
+        Spacer(Modifier.height(6.dp))
+        Text(
+            app.name,
+            style = MaterialTheme.typography.bodySmall.copy(color = NetflixWhite),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.Center
+        )
+    }
+}
+
+@Composable
+fun LauncherTopBar(onSearchClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .statusBarsPadding()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            "B",
+            style = MaterialTheme.typography.displayLarge.copy(
+                fontSize = 38.sp, fontWeight = FontWeight.Black, color = NetflixRed
+            )
+        )
+        IconButton(onClick = onSearchClick) {
+            Icon(Icons.Default.Search, "Ara", tint = NetflixWhite, modifier = Modifier.size(28.dp))
         }
     }
 }

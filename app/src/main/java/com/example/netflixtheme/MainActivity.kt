@@ -6,7 +6,9 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Scaffold
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import com.example.netflixtheme.model.AppUtils
 import com.example.netflixtheme.ui.components.NetflixBottomNavBar
 import com.example.netflixtheme.ui.screens.HomeScreen
 import com.example.netflixtheme.ui.theme.NetflixTheme
@@ -17,11 +19,13 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             NetflixTheme {
+                val apps = remember { AppUtils.getInstalledApps(this@MainActivity) }
+                
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
                     bottomBar = { NetflixBottomNavBar() }
                 ) { _ ->
-                    HomeScreen()
+                    HomeScreen(apps = apps)
                 }
             }
         }
