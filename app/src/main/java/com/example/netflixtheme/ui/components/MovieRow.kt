@@ -51,7 +51,7 @@ fun ContinueWatchingRow(movies: List<Movie>, modifier: Modifier = Modifier, onMo
         LazyRow(contentPadding = PaddingValues(horizontal = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             items(movies) { movie ->
-                ContinueWatchingCard(movie = movie, progress = (0.2f..0.8f).random(), onClick = { onMovieClick(movie) })
+                ContinueWatchingCard(movie = movie, progress = 0.6f, onClick = { onMovieClick(movie) })
             }
         }
     }
