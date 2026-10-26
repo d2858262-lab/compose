@@ -35,7 +35,7 @@ fun NetflixTopBar(isScrolled: Boolean = false, modifier: Modifier = Modifier) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "N",
+                text = "B",
                 style = MaterialTheme.typography.displayLarge.copy(
                     fontSize = 40.sp, fontWeight = FontWeight.Black, color = NetflixRed
                 )
